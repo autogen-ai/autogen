@@ -102,7 +102,9 @@ def gather_usage_summary(agents: List[Agent]) -> Dict[Dict[str, Dict], Dict[str,
     }
 
 
-def parse_tags_from_content(tag: str, content: Union[str, List[Dict[str, Any]]]) -> List[Dict[str, Dict[str, str]]]:
+def parse_tags_from_content(
+    tag: str, content: Union[str, List[Dict[str, Any]]], strict_filepath_match=False
+) -> List[Dict[str, Dict[str, str]]]:
     """Parses HTML style tags from message contents.
 
     The parsing is done by looking for patterns in the text that match the format of HTML tags. The tag to be parsed is
@@ -119,10 +121,13 @@ def parse_tags_from_content(tag: str, content: Union[str, List[Dict[str, Any]]])
         tag (str): The HTML style tag to be parsed.
         content (Union[str, List[Dict[str, Any]]]): The message content to parse. Can be a string or a list of content
             items.
+        strict_filepath_match (bool, optional): If False (default), the parser will match all characters between the tag opening
+            and closing, including quotation marks and spaces. If True, the parser will only match simple tag contents
+            without spaces or quotes. This is useful for parsing filenames or URLs and ignoring complex HTML-like structures.
 
     Returns:
-        List[Dict[str, str]]: A list of dictionaries, where each dictionary represents a parsed tag. Each dictionary
-            contains three key-value pairs: 'type' which is the tag, 'attr' which is a dictionary of the parsed attributes,
+        List[Dict[str, Union[str, Dict[str, str], re.Match]]]: A list of dictionaries, where each dictionary represents a parsed tag. Each dictionary
+            contains three key-value pairs: 'tag' which is the tag name, 'attr' which is a dictionary of the parsed attributes,
             and 'match' which is a regular expression match object.
 
     Raises:
@@ -130,20 +135,26 @@ def parse_tags_from_content(tag: str, content: Union[str, List[Dict[str, Any]]])
     """
     results = []
     if isinstance(content, str):
-        results.extend(_parse_tags_from_text(tag, content))
+        results.extend(_parse_tags_from_text(tag, content, strict_filepath_match))
     # Handles case for multimodal messages.
     elif isinstance(content, list):
         for item in content:
             if item.get("type") == "text":
-                results.extend(_parse_tags_from_text(tag, item["text"]))
+                results.extend(_parse_tags_from_text(tag, item["text"], strict_filepath_match))
     else:
         raise ValueError(f"content must be str or list, but got {type(content)}")
 
     return results
 
 
-def _parse_tags_from_text(tag: str, text: str) -> List[Dict[str, str]]:
-    pattern = re.compile(f"<{tag} (.*?)>")
+def _parse_tags_from_text(
+    tag: str, text: str, strict_filepath_match: bool = False
+) -> List[Dict[str, Union[str, Dict[str, str], re.Match]]]:
+    # the regular expression should not contain quotation marks. Otherwise, it is not a match.
+    if strict_filepath_match:
+        pattern = re.compile(f"<{tag} ([^\"' >]+)>")
+    else:
+        pattern = re.compile(f"<{tag} (.*?)>")
 
     results = []
     for match in re.finditer(pattern, text):
@@ -154,12 +165,12 @@ def _parse_tags_from_text(tag: str, text: str) -> List[Dict[str, str]]:
     return results
 
 
-def _parse_attributes_from_tags(tag_content: str):
+def _parse_attributes_from_tags(tag_content: str) -> Dict[str, str]:
     pattern = r"([^ ]+)"
     attrs = re.findall(pattern, tag_content)
     reconstructed_attrs = _reconstruct_attributes(attrs)
 
-    def _append_src_value(content, value):
+    def _append_src_value(content: Dict[str, str], value: str) -> None:
         if "src" in content:
             content["src"] += f" {value}"
         else:
