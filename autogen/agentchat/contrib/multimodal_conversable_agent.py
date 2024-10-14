@@ -15,10 +15,8 @@ from autogen.agentchat.contrib.img_utils import (
 )
 from autogen.code_utils import content_str
 
-from ..._pydantic import model_dump
-
 DEFAULT_LMM_SYS_MSG = """You are a helpful AI assistant."""
-DEFAULT_MODEL = "gpt-4-vision-preview"
+DEFAULT_MODEL = "gpt-4-turbo"
 
 
 class MultimodalConversableAgent(ConversableAgent):
@@ -116,13 +114,5 @@ class MultimodalConversableAgent(ConversableAgent):
 
         messages_with_b64_img = message_formatter_pil_to_b64(self._oai_system_message + messages)
 
-        # TODO: #1143 handle token limit exceeded error
-        response = client.create(
-            context=messages[-1].pop("context", None), messages=messages_with_b64_img, agent=self.name
-        )
-
-        # TODO: line 301, line 271 is converting messages to dict. Can be removed after ChatCompletionMessage_to_dict is merged.
-        extracted_response = client.extract_text_or_completion_object(response)[0]
-        if not isinstance(extracted_response, str):
-            extracted_response = model_dump(extracted_response)
-        return True, extracted_response
+        extracted_response = self._generate_oai_reply_from_client(client, messages_with_b64_img, self.client_cache)
+        return (False, None) if extracted_response is None else (True, extracted_response)
