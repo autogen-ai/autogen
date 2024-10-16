@@ -281,6 +281,8 @@ class OpenAIClient:
         iostream = IOStream.get_default()
 
         completions: Completions = self._oai_client.chat.completions if "messages" in params else self._oai_client.completions  # type: ignore [attr-defined]
+        params = self._map_params(params.copy())
+
         # If streaming is enabled and has messages, then iterate over the chunks of the response.
         if params.get("stream", False) and "messages" in params:
             response_contents = [""] * params.get("n", 1)
@@ -420,6 +422,40 @@ class OpenAIClient:
         if isinstance(tmp_price1K, tuple):
             return (tmp_price1K[0] * n_input_tokens + tmp_price1K[1] * n_output_tokens) / 1000  # type: ignore [no-any-return]
         return tmp_price1K * (n_input_tokens + n_output_tokens) / 1000  # type: ignore [operator]
+
+    def _map_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Maps parameters that are deprecated"""
+
+        # max_tokens is deprecated and replaced by max_completion_tokens as of 2024.09.12
+        if "max_tokens" in params:
+            params["max_completion_tokens"] = params.pop("max_tokens")
+            logger.warning("OpenAI API: 'max_tokens' parameter is deprecated, converting to 'max_completion_tokens'.")
+
+        if params["model"].startswith("o1"):
+            # Beta limitation - remove streaming, convert system messages to user, remove other parameters which have fixed values
+            # https://platform.openai.com/docs/guides/reasoning/beta-limitations
+            if "stream" in params:
+                if params["stream"]:
+                    logger.warning("OpenAI API o1 beta limitation: streaming is not supported.")
+                params.pop("stream")
+
+            for message in params["messages"]:
+                warned = False
+                if message["role"] == "system":
+                    message["role"] = "user"
+                    if not warned:
+                        logger.warning("OpenAI API o1 beta limitation: changing system messages to user messages.")
+                    warned = True
+
+            fixed_params = ["temperature", "top_p", "n", "presence_penalty", "frequency_penalty"]
+            for param_name in fixed_params:
+                if param_name in params:
+                    logger.warning(
+                        f"OpenAI API o1 beta limitation: {param_name} parameter has a fixed value, removing."
+                    )
+                    params.pop(param_name)
+
+        return params
 
     @staticmethod
     def get_usage(response: Union[ChatCompletion, Completion]) -> Dict:

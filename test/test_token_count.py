@@ -72,9 +72,9 @@ def test_count_token():
             "content": "hello asdfjj qeweee",
         },
     ]
-    assert count_token(messages) == 34
-    assert percentile_used(messages) == 34 / 4096
-    assert token_left(messages) == 4096 - 34
+    assert count_token(messages) == 35
+    assert percentile_used(messages) == 35 / 4096
+    assert token_left(messages) == 4096 - 35
 
     text = "I'm sorry, but I'm not able to"
     assert count_token(text) == 10

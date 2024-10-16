@@ -45,6 +45,10 @@ def get_max_token_limit(model: str = "gpt-3.5-turbo-0613") -> int:
         "gpt-4o-2024-08-06": 128000,
         "gpt-4o-mini": 128000,
         "gpt-4o-mini-2024-07-18": 128000,
+        "o1-preview-2024-09-12": 128000,
+        "o1-preview": 128000,
+        "o1-mini-2024-09-12": 128000,
+        "o1-mini": 128000,
     }
     return max_token_limit[model]
 
@@ -106,33 +110,17 @@ def _num_token_from_messages(messages: Union[List, Dict], model="gpt-3.5-turbo-0
     except KeyError:
         logger.warning(f"Model {model} not found. Using cl100k_base encoding.")
         encoding = tiktoken.get_encoding("cl100k_base")
-    if model in {
-        "gpt-3.5-turbo-0613",
-        "gpt-3.5-turbo-16k-0613",
-        "gpt-4-0314",
-        "gpt-4-32k-0314",
-        "gpt-4-0613",
-        "gpt-4-32k-0613",
-    }:
-        tokens_per_message = 3
-        tokens_per_name = 1
-    elif model == "gpt-3.5-turbo-0301":
+    if "gpt-3" in model or "gpt-4" in model or model.startswith("o1"):
         tokens_per_message = 4  # every message follows <|start|>{role/name}\n{content}<|end|>\n
-        tokens_per_name = -1  # if there's a name, the role is omitted
-    elif "gpt-3.5-turbo" in model:
-        logger.info("gpt-3.5-turbo may update over time. Returning num tokens assuming gpt-3.5-turbo-0613.")
-        return _num_token_from_messages(messages, model="gpt-3.5-turbo-0613")
-    elif "gpt-4" in model:
-        logger.info("gpt-4 may update over time. Returning num tokens assuming gpt-4-0613.")
-        return _num_token_from_messages(messages, model="gpt-4-0613")
+        tokens_per_name = 1  # OpenAI guidance is 1 extra token if 'name' field is used
     elif "gemini" in model:
-        logger.info("Gemini is not supported in tiktoken. Returning num tokens assuming gpt-4-0613.")
+        logger.info("Gemini is not supported in tiktoken. Returning num tokens assuming gpt-4-0613 (2023).")
         return _num_token_from_messages(messages, model="gpt-4-0613")
     elif "claude" in model:
-        logger.info("Claude is not supported in tiktoken. Returning num tokens assuming gpt-4-0613.")
+        logger.info("Claude is not supported in tiktoken. Returning num tokens assuming gpt-4-0613 (2023).")
         return _num_token_from_messages(messages, model="gpt-4-0613")
     elif "mistral-" in model or "mixtral-" in model:
-        logger.info("Mistral.AI models are not supported in tiktoken. Returning num tokens assuming gpt-4-0613.")
+        logger.info("Mistral.AI models are not supported in tiktoken. Returning num tokens assuming gpt-4-0613 (2023).")
         return _num_token_from_messages(messages, model="gpt-4-0613")
     else:
         raise NotImplementedError(
@@ -158,7 +146,7 @@ def _num_token_from_messages(messages: Union[List, Dict], model="gpt-3.5-turbo-0
             num_tokens += len(encoding.encode(value))
             if key == "name":
                 num_tokens += tokens_per_name
-    num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
+    num_tokens += 2  # every reply is primed with <im_start>assistant
     return num_tokens
 
 

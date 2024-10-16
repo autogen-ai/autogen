@@ -37,6 +37,8 @@ gpt4_config_list = [
     {"model": "gpt-4-32k"},
     {"model": "gpt-4o"},
     {"model": "gpt-4o-mini"},
+    {"model": "o1-preview"},
+    {"model": "o1-mini"},
 ]
 
 
