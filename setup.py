@@ -47,6 +47,8 @@ jupyter_executor = [
     "ipykernel>=6.29.0",
 ]
 
+kubernetes_executor = ["kubernetes"]
+
 retrieve_chat = [
     "protobuf==4.25.3",
     "chromadb==0.5.3",
@@ -97,6 +99,7 @@ extra_require = {
     "cosmosdb": ["azure-cosmos>=4.2.0"],
     "websockets": ["websockets>=12.0,<13"],
     "jupyter-executor": jupyter_executor,
+    "kubernetes-executor": kubernetes_executor,
     "types": ["mypy==1.9.0", "pytest>=6.1.1,<8"] + jupyter_executor,
     "long-context": ["llmlingua<0.3"],
     "anthropic": ["anthropic>=0.23.1"],
