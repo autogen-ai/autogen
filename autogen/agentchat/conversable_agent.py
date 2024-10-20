@@ -2132,6 +2132,20 @@ class ConversableAgent(LLMAgent):
                     return reply
         return self._default_auto_reply
 
+    def run(
+        self,
+        message: str,
+        sender: Optional["Agent"] = None,
+    ):
+        if sender is not None:
+            all_message = self._oai_messages[sender]
+            all_message.append({"content": message, "role": "user"})
+            self._oai_messages[sender] = all_message
+        else:
+            all_message = [{"content": message, "role": "user"}]
+        reply = self.generate_reply(messages=all_message)
+        return reply
+
     def _match_trigger(self, trigger: Union[None, str, type, Agent, Callable, List], sender: Optional[Agent]) -> bool:
         """Check if the sender matches the trigger.
 
