@@ -10,10 +10,11 @@ import unittest
 from unittest.mock import MagicMock
 
 import pytest
+from annotated_types import Annotated
 from conftest import MOCK_OPEN_AI_API_KEY
 
 import autogen
-from autogen.agentchat.conversable_agent import ConversableAgent
+from autogen import AssistantAgent, ConversableAgent, UserProxyAgent
 
 try:
     from autogen.agentchat.contrib.img_utils import get_pil_image
@@ -23,6 +24,7 @@ except ImportError:
 else:
     skip = False
 
+VISION_MODEL_NAME = "gpt-4-turbo"
 
 base64_encoded_image = (
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4"
@@ -44,7 +46,7 @@ class TestMultimodalConversableAgent(unittest.TestCase):
             llm_config={
                 "timeout": 600,
                 "seed": 42,
-                "config_list": [{"model": "gpt-4-vision-preview", "api_key": MOCK_OPEN_AI_API_KEY}],
+                "config_list": [{"model": VISION_MODEL_NAME, "api_key": MOCK_OPEN_AI_API_KEY}],
             },
         )
 
@@ -142,6 +144,46 @@ def test_group_chat_with_lmm():
     assert all(len(arr) <= max_round for arr in agent1._oai_messages.values()), "Agent 1 exceeded max rounds"
     assert all(len(arr) <= max_round for arr in agent2._oai_messages.values()), "Agent 2 exceeded max rounds"
     assert all(len(arr) <= max_round for arr in user_proxy._oai_messages.values()), "User proxy exceeded max rounds"
+
+
+@pytest.mark.skipif(skip, reason="Dependency not installed")
+def test_func_call_with_lmm():
+    assistant = MultimodalConversableAgent(
+        name="Assistant",
+        system_message="Describe all the colors in the image.",
+        human_input_mode="NEVER",
+        max_consecutive_auto_reply=2,
+        llm_config={
+            "timeout": 600,
+            "seed": 42,
+            "config_list": [{"model": VISION_MODEL_NAME, "api_key": MOCK_OPEN_AI_API_KEY}],
+        },
+    )
+
+    coder = AssistantAgent(
+        name="Coder",
+        system_message="YOU MUST USE THE FUNCTION PROVIDED.",
+        llm_config={
+            "timeout": 600,
+            "seed": 42,
+            "config_list": [{"model": VISION_MODEL_NAME, "api_key": MOCK_OPEN_AI_API_KEY}],
+        },
+        human_input_mode="NEVER",
+        code_execution_config=False,
+        max_consecutive_auto_reply=2,
+    )
+
+    def count_colors(colors: list) -> int:
+        return len(colors)
+
+    coder.register_for_llm(name="count_colors", description="Count colors.")(count_colors)
+    assistant.register_for_execution(name="count_colors")(count_colors)
+
+    coder.initiate_chat(
+        assistant, clear_history=True, message=f"""How many colors here: <img {base64_encoded_image}>"""
+    )
+
+    assert len(coder._oai_messages[assistant]) > 1, "Function call did not happen"
 
 
 if __name__ == "__main__":
