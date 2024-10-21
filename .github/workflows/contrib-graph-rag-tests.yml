@@ -43,6 +43,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip wheel
           pip install pytest
+      - name: Install graphrag SDK
+        run: |
+          pip install -e .[graphrag_sdk]
       - name: Install Falkor DB SDK when on linux
         run: |
           pip install -e .[graph_rag_falkor_db]
