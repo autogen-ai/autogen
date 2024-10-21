@@ -207,7 +207,7 @@ def gpt4v_formatter(prompt: str, img_format: str = "uri") -> List[Union[str, dic
     image_count = 0
 
     # Find all image tags
-    for parsed_tag in utils.parse_tags_from_content("img", prompt):
+    for parsed_tag in utils.parse_tags_from_content("img", prompt, strict_filepath_match=True):
         image_location = parsed_tag["attr"]["src"]
         try:
             if img_format == "pil":
